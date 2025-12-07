@@ -32,7 +32,7 @@ from telegram.ext import (
 #from sqlalchemy.orm import sessionmaker, Session
 #from sqlalchemy.pool import QueuePool
 
-import aiohttp
+#import aiohttp
 
 # ================= CONFIGURATION =================
 @dataclass
