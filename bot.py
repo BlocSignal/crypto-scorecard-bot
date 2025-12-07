@@ -27,10 +27,10 @@ from telegram.ext import (
     filters
 )
 
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, Boolean, func
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.pool import QueuePool
+#from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, Boolean, func
+#from sqlalchemy.ext.declarative import declarative_base
+#from sqlalchemy.orm import sessionmaker, Session
+#from sqlalchemy.pool import QueuePool
 
 import aiohttp
 
