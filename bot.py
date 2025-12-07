@@ -82,9 +82,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ================= DATABASE MODELS =================
-Base = declarative_base()
+#Base = declarative_base()
 
-class ScorecardRecord(Base):
+#class ScorecardRecord(Base):
     """Stores generated scorecards"""
     __tablename__ = 'scorecards'
     
@@ -102,7 +102,7 @@ class ScorecardRecord(Base):
     interpretation = Column(String(100))
     data_source = Column(String(50), default='coingecko')
 
-class UserRequest(Base):
+#class UserRequest(Base):
     """Track user requests"""
     __tablename__ = 'user_requests'
     
@@ -114,7 +114,7 @@ class UserRequest(Base):
     served_from_cache = Column(Boolean, default=False)
 
 # ================= DATABASE MANAGER =================
-class DatabaseManager:
+#class DatabaseManager:
     """Handles all database operations"""
     
     def __init__(self, database_url: str):
