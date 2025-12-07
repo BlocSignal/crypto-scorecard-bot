@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
-Block_Signal_Bot — Now with Trending + 7-day Charts! (Dec 2025)
-Fully secure, crash-proof, production-ready
+Block_Signal_Bot — Lightweight MVP (No DB Required)
+Real-time crypto scorecards • Dec 2025
+SECURE + CRASH-PROOF VERSION (Dec 2025)
 """
 from __future__ import annotations
 
 import os
 import logging
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 
 import aiohttp
 from telegram import Update
@@ -20,8 +21,8 @@ from telegram.ext import (
     filters,
 )
 
-# ================= SECURITY & LOGGING =================
-logging.getLogger("httpx").setLevel(logging.WARNING)        # Hides token in logs
+# ================= SECURITY: Hide token in logs =================
+logging.getLogger("httpx").setLevel(logging.WARNING)        # This hides the token in logs!
 logging.getLogger("telegram").setLevel(logging.INFO)
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -29,11 +30,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ================= CONFIG =================
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
-    raise ValueError("BOT_TOKEN not set in Render → Environment")
+    raise ValueError("BOT_TOKEN environment variable is not set! Set it in Render → Environment")
 
-# ================= SCORECARD CLASSES (unchanged) =================
+# ================= SCORECARD =================
 @dataclass
 class ScoreDetail:
     score: int
@@ -45,8 +47,12 @@ class CryptoScorecard:
     ticker: str
     _scores: Dict[str, ScoreDetail] = field(default_factory=dict, init=False)
     categories: List[str] = field(default_factory=lambda: [
-        "Adoption & Partnerships", "On-Chain Activity", "Validator / Miner Decentralization",
-        "Governance & Transparency", "Narrative & Market Positioning", "Token Utility & Economics"
+        "Adoption & Partnerships",
+        "On-Chain Activity",
+        "Validator / Miner Decentralization",
+        "Governance & Transparency",
+        "Narrative & Market Positioning",
+        "Token Utility & Economics"
     ])
 
     def add_score(self, category: str, score: int, reasoning: str, sources: Optional[List[str]] = None):
@@ -59,8 +65,10 @@ class CryptoScorecard:
 
     def interpretation(self) -> str:
         ratio = self.total_score / (len(self.categories) * 5)
-        if ratio >= 0.83: return "Serious long-term player"
-        if ratio >= 0.5: return "Promising but risky"
+        if ratio >= 0.83:
+            return "Serious long-term player"
+        if ratio >= 0.5:
+            return "Promising but risky"
         return "Probably hype / weak fundamentals"
 
     def report(self) -> str:
@@ -70,6 +78,7 @@ class CryptoScorecard:
                 d = self._scores[cat]
                 tag = "Excellent" if d.score == 5 else "Good" if d.score >= 4 else "Fair"
                 lines += [f"**{cat}**", f"Score: {d.score}/5 {tag}", f"_{d.reasoning}_", ""]
+
         lines += [
             "---",
             f"**Total**: {self.total_score}/30 ({self.total_score/30:.1%})",
@@ -78,58 +87,76 @@ class CryptoScorecard:
         ]
         return "\n".join(lines)
 
+
 # ================= COINGECKO CLIENT =================
 class CoinGeckoClient:
     BASE = "https://api.coingecko.com/api/v3"
 
     async def search(self, query: str) -> Optional[str]:
+        url = f"{self.BASE}/search"
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
             try:
-                async with session.get(f"{self.BASE}/search", params={"query": query}) as resp:
+                async with session.get(url, params={"query": query}) as resp:
                     if resp.status == 200:
                         data = await resp.json()
                         coins = data.get("coins", [])
-                        if coins: return coins[0]["id"]
+                        if coins:
+                            return coins[0]["id"]
             except Exception as e:
-                logger.warning(f"Search failed for {query}: {e}")
+                logger.warning(f"CoinGecko search failed for {query}: {e}")
         return None
 
     async def get_data(self, coin_id: str) -> Optional[Dict]:
+        url = f"{self.BASE}/coins/{coin_id}"
         params = {
-            "localization": "false", "tickers": "false", "market_data": "true",
-            "community_data": "true", "developer_data": "true", "sparkline": "false"
+            "localization": "false",
+            "tickers": "false",
+            "market_data": "true",
+            "community_data": "true",
+            "developer_data": "true",
+            "sparkline": "false",
         }
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as session:
             try:
-                async with session.get(f"{self.BASE}/coins/{coin_id}", params=params) as resp:
+                async with session.get(url, params=params) as resp:
                     if resp.status == 200:
                         return await resp.json()
             except Exception as e:
-                logger.warning(f"Data fetch failed for {coin_id}: {e}")
+                logger.warning(f"CoinGecko data fetch failed for {coin_id}: {e}")
         return None
+
 
 cg_client = CoinGeckoClient()
 
-# ================= SCORING LOGIC =================
+
+# ================= SCORING LOGIC (Safe defaults) =================
 def score_adoption(data): return (5, "Top-tier adoption") if data.get("market_cap_rank", 999) <= 30 else (4, "Strong adoption")
 def score_activity(data):
     vol = data.get("total_volume", 0)
-    mcap = data.get("market_cap", 1) or 1
+    mcap = data.get("market_cap", 1)
     ratio = vol / mcap
     return (5, "High on-chain activity") if ratio > 0.15 else (4, "Healthy activity") if ratio > 0.05 else (3, "Low activity")
-def score_decentralization(_): return (4, "Balanced decentralization")
+
+def score_decentralization(_): return (4, "Balanced decentralization / PoS network")  # Placeholder
 def score_governance(data):
     stars = data.get("developer_data", {}).get("stars", 0)
-    return (5, "Highly active") if stars > 5000 else (4, "Active dev") if stars > 1000 else (3, "Moderate")
+    return (5, "Highly active development") if stars > 5000 else (4, "Active dev") if stars > 1000 else (3, "Moderate dev activity")
+
 def score_narrative(data): return (5, "Dominant narrative") if data.get("market_cap_rank", 999) <= 50 else (4, "Strong narrative")
-def score_utility(data): return (5, "Capped supply") if data.get("max_supply") else (3, "Inflationary")
+def score_utility(data):
+    return (5, "Strong tokenomics (capped supply)") if data.get("max_supply") else (3, "Inflationary or unlimited supply")
+
 
 async def generate_scorecard(ticker: str) -> Tuple[Optional[CryptoScorecard], Optional[Dict]]:
+    """Now 100% safe — never crashes on bad data"""
     try:
         coin_id = await cg_client.search(ticker.lower())
-        if not coin_id: return None, None
+        if not coin_id:
+            return None, None
+
         raw = await cg_client.get_data(coin_id)
-        if not raw: return None, None
+        if not raw:
+            return None, None
 
         market = raw.get("market_data", {})
         data = {
@@ -141,92 +168,93 @@ async def generate_scorecard(ticker: str) -> Tuple[Optional[CryptoScorecard], Op
         }
 
         card = CryptoScorecard(ticker.upper())
-        for cat, func in zip(card.categories, [score_adoption, score_activity, score_decentralization,
-                                              score_governance, score_narrative, score_utility]):
+        scoring_funcs = [
+            score_adoption,
+            score_activity,
+            score_decentralization,
+            score_governance,
+            score_narrative,
+            score_utility,
+        ]
+
+        for cat, func in zip(card.categories, scoring_funcs):
             try:
                 score, reason = func(data)
                 card.add_score(cat, score, reason)
-            except:
+            except Exception as e:
+                logger.error(f"Scoring failed for {cat}: {e}")
                 card.add_score(cat, 1, "Scoring error")
+
         return card, raw
+
     except Exception as e:
-        logger.error(f"generate_scorecard crash: {e}", exc_info=True)
+        logger.error(f"Unexpected error in generate_scorecard({ticker}): {e}", exc_info=True)
         return None, None
 
-# ================= TRENDING =================
-async def get_trending() -> str:
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.get("https://api.coingecko.com/api/v3/search/trending") as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    lines = ["Trending on CoinGecko right now\n"]
-                    for i, c in enumerate(data["coins"][:10], 1):
-                        coin = c["item"]
-                        lines.append(f"{i}. {coin['symbol'].upper()} — {coin['name']}")
-                    lines.append("\nSend any ticker for instant scorecard + chart!")
-                    return "\n".join(lines)
-        except:
-            pass
-    return "Trending temporarily unavailable"
 
 # ================= HANDLERS =================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = (
-        "*Block_Signal_Bot* \\(Dec 2025\\)\n\n"
-        "Send any ticker → real-time scorecard \\+ 7-day chart in seconds!\n\n"
-        f"{await get_trending()}\n\n"
-        "Powered by Block Signal"
+    await update.message.reply_text(
+        "Block_Signal_Bot\n\nSend any ticker → get real-time scorecard!\n"
+        "Powered by Block Signal • Dec 2025"
     )
-    await update.message.reply_text(text, parse_mode="MarkdownV2", disable_web_page_preview=True)
 
-async def trending_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = await update.message.reply_text("Loading trending…")
-    await msg.edit_text(await get_trending(), parse_mode="Markdown")
 
 async def handle_ticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    ticker = update.message.text.strip().upper()
-    if not (3 <= len(ticker) <= 10 and ticker.isalnum()): return
+    user_text = update.message.text.strip().upper()
+    if not (3 <= len(user_text) <= 10 and user_text.isalnum()):
+        return  # Ignore garbage
 
-    sent = await update.message.reply_text(f"Analyzing {ticker}…")
+    ticker = user_text
+    sent_msg = await update.message.reply_text(f"Analyzing {ticker}...")
 
     card, raw = await generate_scorecard(ticker)
+
     if not card or not raw:
-        await sent.edit_text(f"Could not find {ticker} — check spelling!")
+        await sent_msg.edit_text(f"Could not find or analyze {ticker} — check spelling or try again later.")
         return
 
     name = raw.get("name", ticker)
     price = raw["market_data"]["current_price"].get("usd", 0)
-    change = raw["market_data"]["price_change_percentage_24h"] or 0
-    emoji = "Up" if change > 0 else "Down" if change < 0 else "Flat"
+    change_24h = raw["market_data"]["price_change_percentage_24h"] or 0
+    emoji = "Up" if change_24h > 0 else "Down" if change_24h < 0 else "Flat"
 
-    header = f"*{name} ({ticker})*\nPrice: ${price:,.2f} {emoji} {change:+.2f}% (24h)\n\n"
-    text_report = header + card.report()
+    header = f"*{name} ({ticker})*\nPrice: ${price:,.2f} {emoji} {change_24h:+.2f}% (24h)\n\n"
+    report_text = header + card.report()
 
-    # Send text first
-    await sent.edit_text(text_report, parse_mode="Markdown", disable_web_page_preview=True)
-
-    # Then send beautiful 7-day chart
-    chart_url = f"https://www.coingecko.com/coins/{raw['id']}/usd?v=7d.png"
-    await update.message.reply_photo(
-        photo=chart_url,
-        caption="7-day price chart ↑",
-        reply_to_message_id=update.message.message_id
+    await sent_msg.edit_text(
+        report_text,
+        parse_mode="Markdown",
+        disable_web_page_preview=True,
     )
 
-# ================= ERROR HANDLER =================
-async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
-    logger.error("Unhandled error:", exc_info=context.error)
 
+# ================= GLOBAL ERROR HANDLER (Prevents crashes!) =================
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
+    logger.error("Unhandled exception:", exc_info=context.error)
+    if update and update.effective_message:
+        try:
+            await update.effective_message.reply_text(
+                "Sorry, an internal error occurred. The devs have been notified."
+            )
+        except:
+            pass
+
+
+# ================= MAIN =================
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
+
+    # Register handlers
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("trending", trending_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_ticker))
+
+    # Critical: This prevents the entire bot from dying on one bad update
     app.add_error_handler(error_handler)
 
-    print("Block_Signal_Bot LIVE with CHARTS + TRENDING!")
+    print("Block_Signal_Bot is LIVE and SECURE! @Block_Signal_Bot")
     app.run_polling(drop_pending_updates=True)
+
 
 if __name__ == "__main__":
     main()
