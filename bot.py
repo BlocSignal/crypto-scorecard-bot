@@ -196,7 +196,7 @@ async def generate_scorecard(ticker: str) -> Tuple[Optional[CryptoScorecard], Op
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Block_Signal_Bot\n\nSend any ticker → get real-time scorecard!\n"
-        "Powered by Block Signal • Dec 2025"
+        "Powered by Grok xAI • Dec 2025"
     )
 
 
