@@ -85,7 +85,7 @@ logger = logging.getLogger(__name__)
 #Base = declarative_base()
 
 #class ScorecardRecord(Base):
-    """Stores generated scorecards"""
+"""Stores generated scorecards"""
     __tablename__ = 'scorecards'
     
     id = Column(Integer, primary_key=True)
